@@ -2,36 +2,52 @@ version: 0.2
 
 phases:
   install:
-    runtime-versions:
-      java: openjdk8
+    commands:
+      # Update apt repositories
+      - apt-get update
+      # Install OpenJDK 8 (or 11 if you update your pom.xml to match)
+      - apt-get install -y openjdk-8-jdk
+      # Verify Java installation
+      - java -version
+      - javac -version
+      # Install Maven
+      - apt-get install -y maven
+      # Verify Maven installation
+      - mvn -version
+
   pre_build:
     commands:
       - echo Just listing basic information about the environment
       - which mvn
       - mvn -version
       - pwd
+
   build:
     commands:
       - echo Build started on `date`
-      - mvn package
+      - mvn clean package -X  # Added debug output to help identify issues
+
   post_build:
     commands:
       - echo Build completed on `date`
       - echo Working on creating the tar ball with the WAR and AppSpec file for CodeDeploy
       - mkdir appfiles
       - cd appfiles
-      - cp ../target/HelloWorld-1.war .
+      # Check if the WAR file exists before copying
+      - if [ -f ../target/HelloWorld-1.war ]; then cp ../target/HelloWorld-1.war .; else echo "WAR file not found!"; exit 1; fi
       - cp ../appspec.yml .
       - ls -al
+      # Create the tarball
       - tar -zcvf ../target/HelloWorld.tar.gz *.*
+      # Verify if the tarball was created
+      - if [ -f ../target/HelloWorld.tar.gz ]; then echo "Tarball created successfully."; else echo "Failed to create tarball."; exit 1; fi
       - cd ..
+
 artifacts:
   files:
-# IMPORTANT
-# You have to use the tar.gz if you are manually executing CodeDeploy
     - target/HelloWorld.tar.gz
-# Use the individual files if you are using the CodeDeploy from CodePipeline
-# Reason is pipeline does not untar and errors out saying that the appspec file is not there
-#    - appfiles/appspec.yml
-#    - appfiles/HelloWorld-1.war
   discard-paths: yes
+
+cache:
+  paths:
+    - '/root/.m2/**/*'
